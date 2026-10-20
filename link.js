@@ -12,6 +12,10 @@ export const SYNC = 0xff, HELLO = 0xfe, REST = 0xfd;
 const BAUD = 115200;
 const CH340_VID = 0x1a86;
 
+// Other USB-serial chips Nanos ship with. Listed in the picker only so a board that
+// isn't a CH340 shows up and we can say what it is, instead of "no compatible devices".
+const OTHER_CHIPS = { 0x0403: "FTDI (genuine Nano)", 0x10c4: "CP210x", 0x2341: "Arduino native USB", 0x2a03: "Arduino native USB" };
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class BaseLink {
@@ -57,7 +61,8 @@ export class CH340Link extends BaseLink {
   get label() { return "USB (CH340)"; }
 
   static async request() {
-    return navigator.usb.requestDevice({ filters: [{ vendorId: CH340_VID }] });
+    const vids = [CH340_VID, ...Object.keys(OTHER_CHIPS).map(Number)];
+    return navigator.usb.requestDevice({ filters: vids.map((vendorId) => ({ vendorId })) });
   }
 
   // A board this page was allowed before; no picker needed.
@@ -68,6 +73,11 @@ export class CH340Link extends BaseLink {
   }
 
   async open(dev) {
+    if (dev.vendorId !== CH340_VID) {
+      const hex = (n) => n.toString(16).padStart(4, "0");
+      const chip = OTHER_CHIPS[dev.vendorId] || "unknown chip";
+      throw new Error(`this board uses a ${chip} USB chip (${hex(dev.vendorId)}:${hex(dev.productId)}), not a CH340. Try "Connect (Web Serial)" instead.`);
+    }
     this.dev = dev;
     await dev.open();
     if (dev.configuration === null) await dev.selectConfiguration(1);

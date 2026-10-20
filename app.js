@@ -102,6 +102,7 @@ async function connect(kind, device) {
     log(ok ? `Nano connected over ${l.label}` : `Connected over ${l.label}, but the Nano didn't answer the handshake. Is jaw_servo.ino uploaded?`);
   } catch (e) {
     if (e.name !== "NotFoundError") log(`Connect failed: ${e.message}`);
+    else if (kind === "usb") log("No board picked. If the list was empty, the phone can't see the Nano: use a data USB cable (not charge-only) and an OTG adapter, and turn on OTG in the phone's settings if it has that switch.");
   }
   renderStatus();
 }
