@@ -1,5 +1,5 @@
 // Offline cache for the player shell. The clip pack lives in IndexedDB, not here.
-const CACHE = "skeleton-v1";
+const CACHE = "skeleton-v2";
 const FILES = ["./", "index.html", "app.js", "link.js", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (e) => {

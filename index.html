@@ -40,7 +40,16 @@
   #nowText { font-size: 18px; min-height: 2.8em; margin: 12px 0 4px; }
   .meter { height: 8px; background: #2a2c32; border-radius: 4px; overflow: hidden; margin-top: 10px; }
   #jawBar { height: 100%; width: 0; background: var(--accent); transition: width 40ms linear; }
-  .pool { display: inline-flex; align-items: center; gap: 4px; margin: 0 14px 8px 0; }
+  .pool { display: inline-flex; align-items: center; gap: 4px; }
+  .poolBlock { border-top: 1px solid var(--line); padding: 8px 0; }
+  .poolBlock:first-child { border-top: 0; padding-top: 0; }
+  .poolHead { justify-content: space-between; }
+  .linesBtn { padding: 6px 10px; font-size: 14px; }
+  .lines { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .lines li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 4px 6px; border-radius: 10px; }
+  .lines li.playing { background: #2a2c32; }
+  .lines li.playing .playLine { background: var(--accent); color: #1a1000; border-color: transparent; }
+  .playLine { width: 40px; height: 40px; padding: 0; flex: none; }
   .grid { display: grid; grid-template-columns: 1fr auto; gap: 10px 12px; align-items: center; }
   .grid input[type=number] { width: 84px; }
   input[type=number] {
@@ -70,7 +79,7 @@
   <section class="card">
     <h2>Clips</h2>
     <div class="row"><span id="packDot" class="dot off"></span><span id="packState">No pack loaded</span></div>
-    <div id="pools" style="margin-top:12px"></div>
+    <div id="pools" style="margin:12px 0 8px"></div>
     <label class="file" style="display:inline-block;margin-top:4px">Load skeleton.pack<input id="packFile" type="file"></label>
   </section>
 

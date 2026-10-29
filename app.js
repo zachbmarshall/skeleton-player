@@ -73,6 +73,7 @@ let wakeLock = null;
 let bag = [];
 let loopGen = 0;         // bumps on every Start so a stale loop knows to quit
 let skipNextGap = false;
+let previewGen = 0;      // bumps on every line tapped in the pack list
 
 function log(msg) {
   const el = $("log");
@@ -178,11 +179,40 @@ function play(prepared) {
     src.connect(gain);
     const t0 = ctx.currentTime + 0.1;
     current = { ...prepared, t0, src };
-    src.onended = () => { current = null; resolve(); };
+    src.onended = () => {
+      // A stopped source fires this late, maybe after the next clip has started.
+      if (current?.src === src) { current = null; markPlaying(); }
+      resolve();
+    };
     src.start(t0);
     $("nowText").textContent = prepared.clip.text;
     $("nowPool").textContent = prepared.clip.pool;
+    markPlaying();
   });
+}
+
+function stopCurrent() {
+  if (current) { try { current.src.stop(); } catch (_) { /* already stopped */ } }
+  current = null;
+  markPlaying();
+}
+
+// Plays one line from the pack list; tapping the playing line again stops it.
+async function playLine(clip) {
+  const gen = ++previewGen;
+  const same = current?.clip === clip;
+  if (running) stop();
+  else stopCurrent();
+  if (same) { $("nowText").textContent = "Stopped"; $("nowPool").textContent = ""; return; }
+  try {
+    await ensureAudio();
+    const prepared = await prepare(clip);
+    if (gen !== previewGen || running) return;
+    await play(prepared);
+    if (gen === previewGen && !running) { $("nowText").textContent = "Stopped"; $("nowPool").textContent = ""; }
+  } catch (e) {
+    log(`Can't play ${clip.id}: ${e.message}`);
+  }
 }
 
 async function gap(alive) {
@@ -222,8 +252,7 @@ async function runLoop(gen) {
   if (gen === loopGen) stop();
 }
 
-async function start() {
-  if (!pack) return log("Load a skeleton.pack first.");
+async function ensureAudio() {
   if (!ctx) {
     ctx = new AudioContext({ latencyHint: "playback" });
     gain = ctx.createGain();
@@ -231,6 +260,13 @@ async function start() {
   }
   gain.gain.value = settings.volume;
   await ctx.resume();
+}
+
+async function start() {
+  if (!pack) return log("Load a skeleton.pack first.");
+  previewGen++;
+  stopCurrent();
+  await ensureAudio();
   running = true;
   await keepAwake();
   renderStatus();
@@ -241,8 +277,7 @@ async function start() {
 
 function stop() {
   running = false;
-  if (current) { try { current.src.stop(); } catch (_) { /* already stopped */ } }
-  current = null;
+  stopCurrent();
   if (skipGap) skipGap();
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   $("nowText").textContent = "Stopped";
@@ -272,6 +307,8 @@ async function usePack(blob, fromFile) {
   try {
     const p = await parsePack(blob);
     if (running) stop();
+    previewGen++;
+    stopCurrent();
     pack = p;
     bag = [];
     if (fromFile) {
@@ -316,6 +353,8 @@ function renderPools() {
   const counts = {};
   for (const c of pack.meta.clips) counts[c.pool] = (counts[c.pool] || 0) + 1;
   for (const [pool, n] of Object.entries(counts)) {
+    const block = document.createElement("div");
+    block.className = "poolBlock";
     const label = document.createElement("label");
     label.className = "pool";
     const box = document.createElement("input");
@@ -323,7 +362,43 @@ function renderPools() {
     box.checked = settings.pools[pool] !== false;
     box.onchange = () => { settings.pools[pool] = box.checked; bag = []; saveSettings(); renderStatus(); };
     label.append(box, ` ${pool} `, Object.assign(document.createElement("span"), { className: "muted", textContent: `(${n})` }));
-    el.append(label);
+
+    const list = document.createElement("ol");
+    list.className = "lines";
+    list.hidden = true;
+    for (const clip of pack.meta.clips.filter((c) => c.pool === pool)) {
+      const li = document.createElement("li");
+      li.dataset.id = clip.id;
+      const btn = Object.assign(document.createElement("button"), { className: "playLine", textContent: "▶", title: `Play ${clip.id}` });
+      btn.onclick = () => playLine(clip);
+      li.append(btn, Object.assign(document.createElement("span"), { textContent: clip.text }),
+        Object.assign(document.createElement("span"), { className: "muted", textContent: `${clip.dur_s.toFixed(1)} s` }));
+      list.append(li);
+    }
+
+    const toggle = Object.assign(document.createElement("button"), { className: "linesBtn", textContent: "Lines ▸" });
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.onclick = () => {
+      list.hidden = !list.hidden;
+      toggle.textContent = list.hidden ? "Lines ▸" : "Lines ▾";
+      toggle.setAttribute("aria-expanded", String(!list.hidden));
+    };
+
+    const head = document.createElement("div");
+    head.className = "row poolHead";
+    head.append(label, toggle);
+    block.append(head, list);
+    el.append(block);
+  }
+  markPlaying();
+}
+
+function markPlaying() {
+  const id = current?.clip.id;
+  for (const li of document.querySelectorAll(".lines li")) {
+    const on = li.dataset.id === id;
+    li.classList.toggle("playing", on);
+    li.firstChild.textContent = on ? "■" : "▶";
   }
 }
 
